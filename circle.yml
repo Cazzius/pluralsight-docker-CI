@@ -5,7 +5,7 @@ deployment:
   dockerhub:
     branch: master
     commands:
-      - $DHT
+      - $DockerHubTrigger
 
 test:
   override:    
