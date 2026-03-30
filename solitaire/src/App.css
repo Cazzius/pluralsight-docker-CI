@@ -1,0 +1,309 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0d5016;
+  min-height: 100vh;
+}
+
+.solitaire-app {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 12px;
+  user-select: none;
+}
+
+/* Header */
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  margin-bottom: 16px;
+  color: #e8e8e8;
+}
+
+.game-header h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.game-info {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  font-size: 0.9rem;
+}
+
+.btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: #2563eb;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn:hover {
+  background: #1d4ed8;
+}
+
+.btn-accent {
+  background: #16a34a;
+}
+
+.btn-accent:hover {
+  background: #15803d;
+}
+
+.btn-large {
+  padding: 10px 28px;
+  font-size: 1.1rem;
+}
+
+/* Board layout */
+.game-board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.top-row {
+  display: flex;
+  justify-content: space-between;
+}
+
+.stock-waste {
+  display: flex;
+  gap: 12px;
+}
+
+.foundations {
+  display: flex;
+  gap: 12px;
+}
+
+.tableau {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+/* Cards */
+.card {
+  width: 90px;
+  height: 126px;
+  border-radius: 8px;
+  position: relative;
+  flex-shrink: 0;
+  transition: box-shadow 0.15s;
+}
+
+.card-front {
+  background: white;
+  border: 1px solid #ccc;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: grab;
+}
+
+.card-front:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.card-front.dragging {
+  opacity: 0.6;
+  cursor: grabbing;
+}
+
+.card-back {
+  background: linear-gradient(135deg, #1e40af, #3b82f6);
+  border: 2px solid #1e3a8a;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.card-back-pattern {
+  position: absolute;
+  inset: 4px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 4px,
+    rgba(255, 255, 255, 0.08) 4px,
+    rgba(255, 255, 255, 0.08) 8px
+  );
+}
+
+.card-corner {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.top-left {
+  top: 4px;
+  left: 6px;
+}
+
+.bottom-right {
+  bottom: 4px;
+  right: 6px;
+  transform: rotate(180deg);
+}
+
+.card-rank {
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.card-suit-small {
+  font-size: 0.8rem;
+}
+
+.card-center {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 2.2rem;
+}
+
+/* Piles */
+.pile {
+  position: relative;
+  width: 90px;
+  min-height: 126px;
+}
+
+.pile.spread {
+  min-height: 200px;
+}
+
+.empty-pile {
+  width: 90px;
+  height: 126px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1.2rem;
+  cursor: pointer;
+}
+
+.recycle-icon {
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.foundation-symbol {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.25);
+}
+
+/* Win overlay */
+.win-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.5s ease;
+}
+
+.win-message {
+  background: white;
+  border-radius: 16px;
+  padding: 40px 60px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: scaleIn 0.4s ease;
+}
+
+.win-message h2 {
+  font-size: 2.5rem;
+  color: #16a34a;
+  margin-bottom: 12px;
+}
+
+.win-message p {
+  font-size: 1.1rem;
+  color: #555;
+  margin-bottom: 24px;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .card {
+    width: 65px;
+    height: 91px;
+  }
+
+  .pile {
+    width: 65px;
+    min-height: 91px;
+  }
+
+  .empty-pile {
+    width: 65px;
+    height: 91px;
+  }
+
+  .card-center {
+    font-size: 1.5rem;
+  }
+
+  .card-rank {
+    font-size: 0.75rem;
+  }
+
+  .card-suit-small {
+    font-size: 0.6rem;
+  }
+
+  .tableau {
+    gap: 6px;
+  }
+
+  .solitaire-app {
+    padding: 6px;
+  }
+
+  .game-header h1 {
+    font-size: 1rem;
+  }
+
+  .game-info {
+    gap: 8px;
+    font-size: 0.75rem;
+  }
+}
