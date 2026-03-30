@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<title>Solitaire</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0d5016;min-height:100vh;min-height:100dvh;overflow-x:hidden;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#root{max-width:720px;margin:0 auto;padding:8px}
+
+.header{display:flex;justify-content:space-between;align-items:center;padding:6px 12px;background:rgba(0,0,0,.35);border-radius:10px;margin-bottom:10px;color:#e8e8e8}
+.header h1{font-size:1.1rem;letter-spacing:1px}
+.info{display:flex;gap:10px;align-items:center;font-size:.8rem}
+.btn{padding:5px 12px;border:none;border-radius:6px;background:#2563eb;color:#fff;font-size:.8rem;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.btn:active{background:#1d4ed8}
+.btn-green{background:#16a34a}
+.btn-green:active{background:#15803d}
+.btn-lg{padding:10px 28px;font-size:1.1rem}
+
+.top-row{display:flex;justify-content:space-between;margin-bottom:10px}
+.stock-waste,.foundations{display:flex;gap:8px}
+
+.tableau{display:flex;gap:6px;justify-content:center}
+.tableau-col{position:relative;width:calc((100% - 36px)/7);min-height:160px}
+
+.card-slot{width:100%;aspect-ratio:5/7;border:2px dashed rgba(255,255,255,.25);border-radius:7px;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.35);font-size:1.2rem}
+
+.card{position:absolute;width:100%;aspect-ratio:5/7;border-radius:7px;box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.card-back{background:linear-gradient(135deg,#1e40af,#3b82f6);border:2px solid #1e3a8a}
+.card-back-inner{position:absolute;inset:3px;border:2px solid rgba(255,255,255,.25);border-radius:4px;background:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(255,255,255,.07) 3px,rgba(255,255,255,.07) 6px)}
+.card-face{background:#fff;border:1px solid #bbb}
+.card-face.selected{box-shadow:0 0 0 3px #facc15,0 4px 12px rgba(0,0,0,.4)}
+
+.corner{position:absolute;display:flex;flex-direction:column;align-items:center;line-height:1}
+.tl{top:3px;left:4px}
+.br{bottom:3px;right:4px;transform:rotate(180deg)}
+.rank{font-size:clamp(.55rem,2.2vw,.85rem);font-weight:700}
+.suit-sm{font-size:clamp(.5rem,1.8vw,.7rem)}
+.center-suit{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:clamp(1.2rem,5vw,2rem)}
+
+.stock-pile,.waste-pile,.foundation-pile{position:relative;width:calc((100vw - 80px)/7);max-width:90px;aspect-ratio:5/7}
+
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;z-index:100}
+.win-box{background:#fff;border-radius:16px;padding:32px 48px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.win-box h2{font-size:2rem;color:#16a34a;margin-bottom:8px}
+.win-box p{color:#555;margin-bottom:20px}
+
+@keyframes confetti{0%{transform:translateY(0) rotate(0)}100%{transform:translateY(100vh) rotate(720deg)}}
+.confetti{position:fixed;top:-20px;width:10px;height:10px;border-radius:2px;animation:confetti 3s linear forwards;z-index:99}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script>
+"use strict";
+const e=React.createElement,{useState,useReducer,useCallback,useEffect,useRef}=React;
+
+// Card utilities
+const SUITS=['hearts','diamonds','clubs','spades'];
+const RANKS=['A','2','3','4','5','6','7','8','9','10','J','Q','K'];
+const SYM={hearts:'\u2665',diamonds:'\u2666',clubs:'\u2663',spades:'\u2660'};
+const CLR={hearts:'#dc2626',diamonds:'#dc2626',clubs:'#1a1a2e',spades:'#1a1a2e'};
+const isRed=s=>s==='hearts'||s==='diamonds';
+const oppColor=(a,b)=>isRed(a)!==isRed(b);
+const rv=r=>RANKS.indexOf(r);
+
+function mkDeck(){
+  const d=[];
+  for(const s of SUITS)for(const r of RANKS)d.push({s,r,up:false,id:r+s});
+  return d;
+}
+function shuffle(a){const b=[...a];for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]]}return b}
+function canTab(c,t){if(!t)return c.r==='K';return oppColor(c.s,t.s)&&rv(c.r)===rv(t.r)-1}
+function canFnd(c,t){if(!t)return c.r==='A';return c.s===t.s&&rv(c.r)===rv(t.r)+1}
+
+// State
+function init(){
+  const d=shuffle(mkDeck()),tab=[[],[],[],[],[],[],[]];
+  let i=0;
+  for(let c=0;c<7;c++)for(let r=0;r<=c;r++){const card={...d[i]};card.up=r===c;tab[c].push(card);i++}
+  return{tab,stock:d.slice(i).map(c=>({...c,up:false})),waste:[],fnd:[[],[],[],[]],moves:0,score:0,won:false};
+}
+
+function clone(s){return{tab:s.tab.map(p=>p.map(c=>({...c}))),stock:s.stock.map(c=>({...c})),waste:s.waste.map(c=>({...c})),fnd:s.fnd.map(p=>p.map(c=>({...c}))),moves:s.moves,score:s.score,won:s.won}}
+
+function flipTop(s,src,idx){
+  if(src==='tab'){const p=s.tab[idx];if(p.length>0&&!p[p.length-1].up){p[p.length-1].up=true;s.score+=5}}
+}
+
+function removeCards(s,src,idx,n){
+  if(src==='waste')s.waste.splice(s.waste.length-n,n);
+  else if(src==='tab')s.tab[idx].splice(s.tab[idx].length-n,n);
+  else if(src==='fnd')s.fnd[idx].splice(s.fnd[idx].length-n,n);
+}
+
+function reducer(state,action){
+  switch(action.type){
+    case 'NEW':return init();
+    case 'DRAW':{
+      const s=clone(state);
+      if(s.stock.length===0){s.stock=s.waste.reverse().map(c=>({...c,up:false}));s.waste=[]}
+      else{const c=s.stock.pop();c.up=true;s.waste.push(c)}
+      s.moves++;return s;
+    }
+    case 'TO_TAB':{
+      const{cards,fromSrc,fromIdx,toIdx}=action,s=clone(state);
+      const pile=s.tab[toIdx],top=pile.length?pile[pile.length-1]:null;
+      if(!canTab(cards[0],top))return state;
+      removeCards(s,fromSrc,fromIdx,cards.length);
+      pile.push(...cards.map(c=>({...c,up:true})));
+      flipTop(s,fromSrc,fromIdx);s.moves++;
+      if(fromSrc==='waste')s.score+=5;
+      if(fromSrc==='fnd')s.score=Math.max(0,s.score-15);
+      return s;
+    }
+    case 'TO_FND':{
+      const{card,fromSrc,fromIdx,fndIdx}=action,s=clone(state);
+      const f=s.fnd[fndIdx],top=f.length?f[f.length-1]:null;
+      if(!canFnd(card,top))return state;
+      removeCards(s,fromSrc,fromIdx,1);
+      f.push({...card,up:true});flipTop(s,fromSrc,fromIdx);
+      s.moves++;s.score+=10;
+      if(s.fnd.every(p=>p.length===13))s.won=true;
+      return s;
+    }
+    case 'AUTO':{
+      let s=clone(state),moved=true;
+      while(moved){moved=false;
+        for(let ti=0;ti<7;ti++){const p=s.tab[ti];if(!p.length)continue;const c=p[p.length-1];if(!c.up)continue;
+          for(let fi=0;fi<4;fi++){const ft=s.fnd[fi].length?s.fnd[fi][s.fnd[fi].length-1]:null;
+            if(canFnd(c,ft)){p.pop();s.fnd[fi].push({...c,up:true});if(p.length&&!p[p.length-1].up)p[p.length-1].up=true;s.score+=10;s.moves++;moved=true;break}}}
+        if(s.waste.length){const c=s.waste[s.waste.length-1];
+          for(let fi=0;fi<4;fi++){const ft=s.fnd[fi].length?s.fnd[fi][s.fnd[fi].length-1]:null;
+            if(canFnd(c,ft)){s.waste.pop();s.fnd[fi].push({...c,up:true});s.score+=10;s.moves++;moved=true;break}}}}
+      if(s.fnd.every(p=>p.length===13))s.won=true;
+      return s;
+    }
+    default:return state;
+  }
+}
+
+// Touch handling hook
+function useTapAndDrag(onTap,onDoubleTap,onDragStart){
+  const lastTap=useRef(0);
+  const handlers=useRef({});
+  handlers.current={onTap,onDoubleTap,onDragStart};
+
+  const onPointerDown=useCallback((ev)=>{
+    // We use click/touch events instead
+  },[]);
+
+  const onClick=useCallback((ev)=>{
+    ev.stopPropagation();
+    const now=Date.now();
+    if(now-lastTap.current<350){
+      lastTap.current=0;
+      if(handlers.current.onDoubleTap)handlers.current.onDoubleTap();
+    }else{
+      lastTap.current=now;
+      if(handlers.current.onTap)handlers.current.onTap();
+    }
+  },[]);
+
+  return{onClick};
+}
+
+// Card component
+function Card({card,style,onTap,onDoubleTap,selected}){
+  if(!card)return null;
+  const{onClick}=useTapAndDrag(onTap,onDoubleTap);
+
+  if(!card.up)return e('div',{className:'card card-back',style,onClick:onTap},
+    e('div',{className:'card-back-inner'}));
+
+  const color=CLR[card.s],sym=SYM[card.s];
+  return e('div',{className:'card card-face'+(selected?' selected':''),style:{...style,color},onClick},
+    e('div',{className:'corner tl'},e('span',{className:'rank'},card.r),e('span',{className:'suit-sm'},sym)),
+    e('div',{className:'center-suit'},sym),
+    e('div',{className:'corner br'},e('span',{className:'rank'},card.r),e('span',{className:'suit-sm'},sym))
+  );
+}
+
+// Confetti
+function Confetti(){
+  const colors=['#dc2626','#2563eb','#16a34a','#facc15','#a855f7','#f97316'];
+  const pieces=Array.from({length:40},(_,i)=>({
+    left:Math.random()*100+'%',
+    bg:colors[i%colors.length],
+    delay:Math.random()*2+'s',
+    dur:2+Math.random()*2+'s'
+  }));
+  return e('div',null,...pieces.map((p,i)=>e('div',{key:i,className:'confetti',style:{left:p.left,background:p.bg,animationDelay:p.delay,animationDuration:p.dur}})));
+}
+
+// Main App
+function App(){
+  const[state,dispatch]=useReducer(reducer,null,init);
+  const[sel,setSel]=useState(null); // {cards, fromSrc, fromIdx}
+
+  const clearSel=()=>setSel(null);
+
+  const tryMoveToFoundation=(card,fromSrc,fromIdx)=>{
+    for(let fi=0;fi<4;fi++){
+      const ft=state.fnd[fi].length?state.fnd[fi][state.fnd[fi].length-1]:null;
+      if(canFnd(card,ft)){dispatch({type:'TO_FND',card,fromSrc,fromIdx,fndIdx:fi});return true}
+    }
+    return false;
+  };
+
+  const handleStockClick=()=>{clearSel();dispatch({type:'DRAW'})};
+
+  const handleWasteTap=()=>{
+    if(!state.waste.length)return;
+    const card=state.waste[state.waste.length-1];
+    if(sel&&sel.fromSrc==='waste'){clearSel();return}
+    setSel({cards:[card],fromSrc:'waste',fromIdx:0});
+  };
+
+  const handleWasteDblTap=()=>{
+    if(!state.waste.length)return;
+    const card=state.waste[state.waste.length-1];
+    if(tryMoveToFoundation(card,'waste',0))clearSel();
+  };
+
+  const handleTabTap=(colIdx,cardIdx)=>{
+    const pile=state.tab[colIdx];
+    if(!pile.length){
+      // Empty column — try to place selection
+      if(sel){
+        dispatch({type:'TO_TAB',cards:sel.cards,fromSrc:sel.fromSrc,fromIdx:sel.fromIdx,toIdx:colIdx});
+        clearSel();
+      }
+      return;
+    }
+    const card=pile[cardIdx];
+    if(!card.up)return;
+
+    // If we have a selection, try to place it
+    if(sel){
+      // Don't place on self
+      if(sel.fromSrc==='tab'&&sel.fromIdx===colIdx){clearSel();return}
+      dispatch({type:'TO_TAB',cards:sel.cards,fromSrc:sel.fromSrc,fromIdx:sel.fromIdx,toIdx:colIdx});
+      clearSel();
+      return;
+    }
+    // Select this card and all below it
+    const cards=pile.slice(cardIdx);
+    setSel({cards,fromSrc:'tab',fromIdx:colIdx});
+  };
+
+  const handleTabDblTap=(colIdx)=>{
+    const pile=state.tab[colIdx];
+    if(!pile.length)return;
+    const card=pile[pile.length-1];
+    if(!card.up)return;
+    if(tryMoveToFoundation(card,'tab',colIdx))clearSel();
+  };
+
+  const handleFndTap=(fndIdx)=>{
+    if(sel){
+      if(sel.cards.length===1){
+        dispatch({type:'TO_FND',card:sel.cards[0],fromSrc:sel.fromSrc,fromIdx:sel.fromIdx,fndIdx});
+      }
+      clearSel();
+      return;
+    }
+    // Select top of foundation
+    const f=state.fnd[fndIdx];
+    if(f.length){
+      setSel({cards:[f[f.length-1]],fromSrc:'fnd',fromIdx:fndIdx});
+    }
+  };
+
+  const canAuto=state.stock.length===0&&state.waste.length===0&&state.tab.every(p=>p.every(c=>c.up));
+
+  // Render stock
+  const stockEl=e('div',{className:'stock-pile',onClick:handleStockClick},
+    e('div',{className:'card-slot'},state.stock.length?
+      e('div',{className:'card card-back',style:{position:'absolute',inset:0}},e('div',{className:'card-back-inner'})):
+      e('span',{style:{fontSize:'1.8rem'}},'\u21BB'))
+  );
+
+  // Render waste
+  const wasteCard=state.waste.length?state.waste[state.waste.length-1]:null;
+  const wasteSelected=sel&&sel.fromSrc==='waste';
+  const wasteEl=e('div',{className:'waste-pile'},
+    e('div',{className:'card-slot'}),
+    wasteCard?e(Card,{card:wasteCard,style:{position:'absolute',inset:0,zIndex:1},onTap:handleWasteTap,onDoubleTap:handleWasteDblTap,selected:wasteSelected}):null
+  );
+
+  // Render foundations
+  const fndEls=state.fnd.map((f,fi)=>{
+    const top=f.length?f[f.length-1]:null;
+    const fndSelected=sel&&sel.fromSrc==='fnd'&&sel.fromIdx===fi;
+    return e('div',{key:fi,className:'foundation-pile',onClick:()=>handleFndTap(fi)},
+      e('div',{className:'card-slot'},!top?e('span',{style:{fontWeight:700,fontSize:'1.1rem'}},'A'):null),
+      top?e(Card,{card:top,style:{position:'absolute',inset:0,zIndex:1},onTap:()=>handleFndTap(fi),selected:fndSelected}):null
+    );
+  });
+
+  // Render tableau
+  const tabEls=state.tab.map((pile,ci)=>{
+    let offset=0;
+    const cards=pile.map((card,idx)=>{
+      const top=offset;
+      offset+=card.up?28:14;
+      const isSelected=sel&&sel.fromSrc==='tab'&&sel.fromIdx===ci&&idx>=pile.length-sel.cards.length;
+      return e(Card,{key:card.id,card,selected:isSelected,style:{position:'absolute',top:top+'px',left:0,right:0,zIndex:idx},
+        onTap:()=>handleTabTap(ci,idx),
+        onDoubleTap:idx===pile.length-1?()=>handleTabDblTap(ci):undefined});
+    });
+    const minH=offset+90;
+    return e('div',{key:ci,className:'tableau-col',style:{minHeight:minH+'px'},
+      onClick:()=>{if(!pile.length)handleTabTap(ci,0)}},
+      e('div',{className:'card-slot'}),
+      ...cards);
+  });
+
+  return e('div',{id:'game',onClick:clearSel},
+    // Header
+    e('div',{className:'header'},
+      e('h1',null,'Solitaire'),
+      e('div',{className:'info'},
+        e('span',null,'Score: '+state.score),
+        e('span',null,'Moves: '+state.moves),
+        e('button',{className:'btn',onClick:(ev)=>{ev.stopPropagation();clearSel();dispatch({type:'NEW'})}},'New'),
+        canAuto?e('button',{className:'btn btn-green',onClick:(ev)=>{ev.stopPropagation();dispatch({type:'AUTO'})}},'Auto'):null
+      )
+    ),
+    // Top row
+    e('div',{className:'top-row'},
+      e('div',{className:'stock-waste'},stockEl,wasteEl),
+      e('div',{className:'foundations'},...fndEls)
+    ),
+    // Tableau
+    e('div',{className:'tableau'},...tabEls),
+    // Win
+    state.won?e('div',null,
+      e(Confetti),
+      e('div',{className:'overlay'},
+        e('div',{className:'win-box'},
+          e('h2',null,'You Win!'),
+          e('p',null,'Score: '+state.score+' \u2022 Moves: '+state.moves),
+          e('button',{className:'btn btn-lg btn-green',onClick:()=>dispatch({type:'NEW'})},'Play Again')
+        ))
+    ):null
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(e(App));
+</script>
+</body>
+</html>
